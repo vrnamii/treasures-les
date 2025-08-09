@@ -59,6 +59,7 @@ type Accommodation implements Entity & Node {
     This argument will overwrite any existing locale filtering defined in the query's tree for the subtree.
     """
     locales: [Locale!]
+    where: AssetSingleRelationWhereInput
   ): Asset
 
   """List of Accommodation versions"""
@@ -1573,6 +1574,11 @@ type Asset implements Entity & Node {
     locales: [Locale!]
   ): User
 
+  """
+  Returns information you need to upload the asset. The type of upload is dependant on what you pass into asset creations as upload type.
+  """
+  upload: AssetUpload
+
   """Get the url for the asset with provided transformations applied."""
   url(transformation: AssetTransformationInput): String!
 
@@ -1603,15 +1609,13 @@ type AssetConnection {
 
 input AssetCreateInput {
   createdAt: DateTime
-  fileName: String!
-  handle: String!
+  fileName: String
   headerImageAccommodation: AccommodationCreateManyInlineInput
   headerImageBlog: BlogCreateManyInlineInput
   headerImageDestination: DestinationCreateManyInlineInput
   headerImageDocument: DocumentCreateManyInlineInput
   headerImageProduct: ProductCreateManyInlineInput
   headerImageTour: TourCreateManyInlineInput
-  height: Float
   imageAccommodation: AccommodationCreateManyInlineInput
   imageDocument: DocumentCreateManyInlineInput
   imageTour: TourCreateManyInlineInput
@@ -1620,24 +1624,26 @@ input AssetCreateInput {
   Inline mutations for managing document localizations excluding the default locale
   """
   localizations: AssetCreateLocalizationsInput
-  mimeType: String
   productImageDestination: DestinationCreateManyInlineInput
   productImageProduct: ProductCreateManyInlineInput
   shopLogoShop: ShopCreateManyInlineInput
-  size: Float
   updatedAt: DateTime
-  width: Float
+
+  """
+  Optionally the system can upload a file for you, for that you need to provide a publicly accessible url
+  """
+  uploadUrl: String
 }
 
 input AssetCreateLocalizationDataInput {
   createdAt: DateTime
-  fileName: String!
-  handle: String!
-  height: Float
-  mimeType: String
-  size: Float
+  fileName: String
   updatedAt: DateTime
-  width: Float
+
+  """
+  Optionally the system can upload a file for you, for that you need to provide a publicly accessible url
+  """
+  uploadUrl: String
 }
 
 input AssetCreateLocalizationInput {
@@ -1828,6 +1834,7 @@ input AssetManyWhereInput {
   """All values that are not contained in given list."""
   updatedAt_not_in: [DateTime]
   updatedBy: UserWhereInput
+  upload: AssetUploadWhereInput
 }
 
 enum AssetOrderByInput {
@@ -1853,6 +1860,19 @@ enum AssetOrderByInput {
   width_DESC
 }
 
+"""Identifies documents"""
+input AssetSingleRelationWhereInput {
+  """Logical AND on all given filters."""
+  AND: [AssetSingleRelationWhereInput!]
+
+  """Logical NOT on all given filters combined by AND."""
+  NOT: [AssetSingleRelationWhereInput!]
+
+  """Logical OR on all given filters."""
+  OR: [AssetSingleRelationWhereInput!]
+  upload: AssetUploadWhereInput
+}
+
 """Transformations for Assets"""
 input AssetTransformationInput {
   document: DocumentTransformationInput
@@ -1864,35 +1884,41 @@ input AssetTransformationInput {
 
 input AssetUpdateInput {
   fileName: String
-  handle: String
   headerImageAccommodation: AccommodationUpdateManyInlineInput
   headerImageBlog: BlogUpdateManyInlineInput
   headerImageDestination: DestinationUpdateManyInlineInput
   headerImageDocument: DocumentUpdateManyInlineInput
   headerImageProduct: ProductUpdateManyInlineInput
   headerImageTour: TourUpdateManyInlineInput
-  height: Float
   imageAccommodation: AccommodationUpdateManyInlineInput
   imageDocument: DocumentUpdateManyInlineInput
   imageTour: TourUpdateManyInlineInput
 
   """Manage document localizations"""
   localizations: AssetUpdateLocalizationsInput
-  mimeType: String
   productImageDestination: DestinationUpdateManyInlineInput
   productImageProduct: ProductUpdateManyInlineInput
+
+  """Use this to define if its a reupload for the asset"""
+  reUpload: Boolean
   shopLogoShop: ShopUpdateManyInlineInput
-  size: Float
-  width: Float
+
+  """
+  Optionally the system can upload a file for you, for that you need to provide a publicly accessible url
+  """
+  uploadUrl: String
 }
 
 input AssetUpdateLocalizationDataInput {
   fileName: String
-  handle: String
-  height: Float
-  mimeType: String
-  size: Float
-  width: Float
+
+  """Use this to define if its a reupload for the asset"""
+  reUpload: Boolean
+
+  """
+  Optionally the system can upload a file for you, for that you need to provide a publicly accessible url
+  """
+  uploadUrl: String
 }
 
 input AssetUpdateLocalizationInput {
@@ -1938,32 +1964,8 @@ input AssetUpdateManyInlineInput {
 }
 
 input AssetUpdateManyInput {
-  fileName: String
-  height: Float
-
-  """Optional updates to localizations"""
-  localizations: AssetUpdateManyLocalizationsInput
-  mimeType: String
-  size: Float
-  width: Float
-}
-
-input AssetUpdateManyLocalizationDataInput {
-  fileName: String
-  height: Float
-  mimeType: String
-  size: Float
-  width: Float
-}
-
-input AssetUpdateManyLocalizationInput {
-  data: AssetUpdateManyLocalizationDataInput!
-  locale: Locale!
-}
-
-input AssetUpdateManyLocalizationsInput {
-  """Localizations to update"""
-  update: [AssetUpdateManyLocalizationInput!]
+  """No fields in updateMany data input"""
+  _: String
 }
 
 input AssetUpdateManyWithNestedWhereInput {
@@ -2000,6 +2002,164 @@ input AssetUpdateWithNestedWhereUniqueInput {
 
   """Unique document search"""
   where: AssetWhereUniqueInput!
+}
+
+"""Asset Upload"""
+type AssetUpload {
+  """Asset Upload Error"""
+  error: AssetUploadError
+
+  """Expiry Timestamp"""
+  expiresAt: DateTime
+
+  """Asset Request Data for upload"""
+  requestPostData: AssetUploadRequestPostData
+
+  """Asset Request Data for upload"""
+  status: AssetUploadStatus
+}
+
+"""Represents asset upload error"""
+type AssetUploadError {
+  code: String!
+  message: String!
+}
+
+"""Asset Upload Request Post Data"""
+type AssetUploadRequestPostData {
+  """
+  The algorithm to use in the form field. This value should be passed in the `X-Amz-Algorithm` form field.
+  """
+  algorithm: String!
+
+  """
+  The credential to use in the form field. This value should be passed in the `X-Amz-Credential` form field.
+  """
+  credential: String!
+
+  """
+  The date the request was signed, formatted as YYYYMMDDTHHMMSSZ. This value should be passed in the `X-Amz-Date` header.
+  """
+  date: String!
+
+  """
+  The key to use in the form field. This value should be passed in the `Key` form field.
+  """
+  key: String!
+
+  """
+  The policy to use in the form field. This value should be passed in the `Policy` form field.
+  """
+  policy: String!
+
+  """
+  The security token to use in the form field. This field is optional only pass it if its not null. This value should be passed in the `X-Amz-Security-Token` form field if not null.
+  """
+  securityToken: String
+
+  """
+  The signature to use in the form field. This value should be passed in the `X-Amz-Signature` form field.
+  """
+  signature: String!
+
+  """The URL to which the file should be uploaded with a POST request."""
+  url: String!
+}
+
+"""System Asset Upload Status"""
+enum AssetUploadStatus {
+  ASSET_CREATE_PENDING
+  ASSET_ERROR_UPLOAD
+  ASSET_UPDATE_PENDING
+  ASSET_UPLOAD_COMPLETE
+}
+
+"""Identifies documents"""
+input AssetUploadWhereInput {
+  """Logical AND on all given filters."""
+  AND: [AssetUploadWhereInput!]
+
+  """Logical NOT on all given filters combined by AND."""
+  NOT: [AssetUploadWhereInput!]
+
+  """Logical OR on all given filters."""
+  OR: [AssetUploadWhereInput!]
+  expiresAt: DateTime
+
+  """All values greater than the given value."""
+  expiresAt_gt: DateTime
+
+  """All values greater than or equal the given value."""
+  expiresAt_gte: DateTime
+
+  """All values that are contained in given list."""
+  expiresAt_in: [DateTime]
+
+  """All values less than the given value."""
+  expiresAt_lt: DateTime
+
+  """All values less than or equal the given value."""
+  expiresAt_lte: DateTime
+
+  """Any other value that exists and is not equal to the given value."""
+  expiresAt_not: DateTime
+
+  """All values that are not contained in given list."""
+  expiresAt_not_in: [DateTime]
+  status: AssetUploadStatus
+
+  """All values that are contained in given list."""
+  status_in: [AssetUploadStatus]
+
+  """Any other value that exists and is not equal to the given value."""
+  status_not: AssetUploadStatus
+
+  """All values that are not contained in given list."""
+  status_not_in: [AssetUploadStatus]
+}
+
+"""Identifies documents"""
+input AssetUploadWhereStageInput {
+  """Logical AND on all given filters."""
+  AND: [AssetUploadWhereInput!]
+
+  """Logical NOT on all given filters combined by AND."""
+  NOT: [AssetUploadWhereInput!]
+
+  """Logical OR on all given filters."""
+  OR: [AssetUploadWhereInput!]
+  expiresAt: DateTime
+
+  """All values greater than the given value."""
+  expiresAt_gt: DateTime
+
+  """All values greater than or equal the given value."""
+  expiresAt_gte: DateTime
+
+  """All values that are contained in given list."""
+  expiresAt_in: [DateTime]
+
+  """All values less than the given value."""
+  expiresAt_lt: DateTime
+
+  """All values less than or equal the given value."""
+  expiresAt_lte: DateTime
+
+  """Any other value that exists and is not equal to the given value."""
+  expiresAt_not: DateTime
+
+  """All values that are not contained in given list."""
+  expiresAt_not_in: [DateTime]
+  status: AssetUploadStatus
+
+  """All values that are contained in given list."""
+  status_in: [AssetUploadStatus]
+
+  """Any other value that exists and is not equal to the given value."""
+  status_not: AssetUploadStatus
+
+  """All values that are not contained in given list."""
+  status_not_in: [AssetUploadStatus]
 }
 
 input AssetUpsertInput {
@@ -2314,6 +2474,7 @@ input AssetWhereInput {
   """All values that are not contained in given list."""
   updatedAt_not_in: [DateTime]
   updatedBy: UserWhereInput
+  upload: AssetUploadWhereInput
   width: Float
 
   """All values greater than the given value."""
@@ -2433,6 +2594,7 @@ type Blog implements Entity & Node {
     This argument will overwrite any existing locale filtering defined in the query's tree for the subtree.
     """
     locales: [Locale!]
+    where: AssetSingleRelationWhereInput
   ): Asset
 
   """List of Blog versions"""
@@ -3340,6 +3502,7 @@ type Destination implements Entity & Node {
     This argument will overwrite any existing locale filtering defined in the query's tree for the subtree.
     """
     locales: [Locale!]
+    where: AssetSingleRelationWhereInput
   ): Asset
 
   """List of Destination versions"""
@@ -4463,6 +4626,7 @@ type Document implements Entity & Node {
     This argument will overwrite any existing locale filtering defined in the query's tree for the subtree.
     """
     locales: [Locale!]
+    where: AssetSingleRelationWhereInput
   ): Asset
 
   """List of Document versions"""
@@ -4653,22 +4817,19 @@ type DocumentEdge {
 }
 
 enum DocumentFileTypes {
-  doc
-  docx
-  html
+  """
+  Automatically selects the best format for the image based on the browser's capabilities.
+  """
+  autoImage
+  avif
+  bmp
+  gif
+  heic
   jpg
-  odp
-  ods
-  odt
-  pdf
   png
-  ppt
-  pptx
   svg
-  txt
+  tiff
   webp
-  xls
-  xlsx
 }
 
 """Identifies documents"""
@@ -4899,27 +5060,15 @@ input DocumentOutputInput {
   Transforms a document into a desired file type.
   See this matrix for format support:
   
-  PDF:	jpg, odp, ods, odt, png, svg, txt, and webp
-  DOC:	docx, html, jpg, odt, pdf, png, svg, txt, and webp
-  DOCX:	doc, html, jpg, odt, pdf, png, svg, txt, and webp
-  ODT:	doc, docx, html, jpg, pdf, png, svg, txt, and webp
-  XLS:	jpg, pdf, ods, png, svg, xlsx, and webp
-  XLSX:	jpg, pdf, ods, png, svg, xls, and webp
-  ODS:	jpg, pdf, png, xls, svg, xlsx, and webp
-  PPT:	jpg, odp, pdf, png, svg, pptx, and webp
-  PPTX:	jpg, odp, pdf, png, svg, ppt, and webp
-  ODP:	jpg, pdf, png, ppt, svg, pptx, and webp
-  BMP:	jpg, odp, ods, odt, pdf, png, svg, and webp
-  GIF:	jpg, odp, ods, odt, pdf, png, svg, and webp
-  JPG:	jpg, odp, ods, odt, pdf, png, svg, and webp
-  PNG:	jpg, odp, ods, odt, pdf, png, svg, and webp
-  WEBP:	jpg, odp, ods, odt, pdf, png, svg, and webp
-  TIFF:	jpg, odp, ods, odt, pdf, png, svg, and webp
-  AI:	    jpg, odp, ods, odt, pdf, png, svg, and webp
-  PSD:	jpg, odp, ods, odt, pdf, png, svg, and webp
-  SVG:	jpg, odp, ods, odt, pdf, png, and webp
-  HTML:	jpg, odt, pdf, svg, txt, and webp
-  TXT:	jpg, html, odt, pdf, svg, and webp
+  JPG:	autoImage, bmp, gif, jpg, png, webp, tiff
+  PNG:	autoImage, bmp, gif, jpg, png, webp, tiff, svg
+  SVG:	autoImage, bmp, gif, jpg, png, webp, tiff
+  WEBP:	autoImage, bmp, gif, jpg, png, webp, tiff, svg
+  GIF:	autoImage, bmp, gif, jpg, png, webp, tiff, svg
+  TIFF:	autoImage, bmp, gif, jpg, png, webp, tiff, svg
+  AVIF:	autoImage, bmp, gif, jpg, png, webp, tiff, svg
+  PDF: 	autoImage, gif, jpg, png, webp, tiff
+  
   """
   format: DocumentFileTypes
 }
@@ -5942,6 +6091,64 @@ input EntityWhereInput {
 
 scalar Hex
 
+input ImageBlurInput {
+  """
+  The amount of blurring to apply to the image. The value must be an integer from 1 to 20.
+  """
+  amount: Int!
+}
+
+"""Adds a border to the image."""
+input ImageBorderInput {
+  """
+  The background color of the border. The value must be a valid hex color code. Or one of the supported color names.
+  """
+  background: String!
+
+  """
+  The color of the border. The value must be a valid hex color code. Or one of the supported color names.
+  """
+  color: String!
+
+  """
+  The width of the border in pixels. The value must be an integer from 1 to 1000.
+  """
+  width: Int!
+}
+
+input ImageCompressInput {
+  """Preserves the metadata of the image."""
+  metadata: Boolean!
+}
+
+"""
+Crops the image to the specified dimensions.
+The starting points for X and Y coordinates are [0,0], aligning with the top-left corner of the image.
+The width and height parameters determine the size in pixels of the cropping rectangle.
+The output will include only the portion of the image within the designated crop area.
+"""
+input ImageCropInput {
+  """
+  The height in pixels to resize the image to. The value must be an integer from 1 to 10000.
+  """
+  height: Int!
+
+  """
+  The width in pixels to resize the image to. The value must be an integer from 1 to 10000.
+  """
+  width: Int!
+
+  """
+  The x coordinate of the image. The value must be an integer from 0 to 10000.
+  """
+  x: Int!
+
+  """
+  The y coordinate of the image. The value must be an integer from 0 to 10000.
+  """
+  y: Int!
+}
+
 enum ImageFit {
   """
   Resizes the image to fit within the specified parameters without distorting, cropping, or changing the aspect ratio.
@@ -5964,6 +6171,11 @@ enum ImageFit {
   scale
 }
 
+input ImageQualityInput {
+  """The quality of the image. The value must be an integer from 1 to 100."""
+  value: Int!
+}
+
 input ImageResizeInput {
   """The default value for the fit parameter is fit:clip."""
   fit: ImageFit
@@ -5979,10 +6191,38 @@ input ImageResizeInput {
   width: Int
 }
 
+input ImageSharpenInput {
+  """
+  The amount of sharpening to apply to the image. The value must be an integer from 1 to 20.
+  """
+  amount: Int!
+}
+
 """Transformations for Images"""
 input ImageTransformationInput {
+  """Blurs the image."""
+  blur: ImageBlurInput
+
+  """Adds a border to the image."""
+  border: ImageBorderInput
+
+  """Compresses the image."""
+  compress: ImageCompressInput
+
+  """Crops the image to the specified dimensions."""
+  crop: ImageCropInput
+
+  """
+  Changes the quality of the image. The value must be an integer from 1 to 100.
+  Only supported for the following formats jpeg, jpg, webp, gif, heif, tiff, avif.
+  """
+  quality: ImageQualityInput
+
   """Resizes the image"""
   resize: ImageResizeInput
+
+  """Sharpens the image."""
+  sharpen: ImageSharpenInput
 }
 
 """Raw JSON value"""
@@ -6016,8 +6256,10 @@ type Mutation {
   """Create one accommodation"""
   createAccommodation(data: AccommodationCreateInput!): Accommodation
 
-  """Create one asset"""
-  createAsset(data: AssetCreateInput!): Asset @deprecated(reason: "Asset mutations will be overhauled soon")
+  """
+  Create an asset. Use the returned info to finish the creation process by uploading the asset.
+  """
+  createAsset(data: AssetCreateInput!): Asset
 
   """Create one blog"""
   createBlog(data: BlogCreateInput!): Blog
@@ -7719,6 +7961,7 @@ type Product implements Entity & Node {
     This argument will overwrite any existing locale filtering defined in the query's tree for the subtree.
     """
     locales: [Locale!]
+    where: AssetSingleRelationWhereInput
   ): Asset
 
   """List of Product versions"""
@@ -11742,6 +11985,7 @@ type Shop implements Entity & Node {
     This argument will overwrite any existing locale filtering defined in the query's tree for the subtree.
     """
     locales: [Locale!]
+    where: AssetSingleRelationWhereInput
   ): Asset
   shopName: String
   shopProduct(
@@ -12833,6 +13077,7 @@ type Tour implements Entity & Node {
     This argument will overwrite any existing locale filtering defined in the query's tree for the subtree.
     """
     locales: [Locale!]
+    where: AssetSingleRelationWhereInput
   ): Asset
 
   """List of Tour versions"""
@@ -14389,6 +14634,7 @@ enum _FilterKind {
   contains_all
   contains_none
   contains_some
+  descendants_of
   ends_with
   eq
   eq_not
